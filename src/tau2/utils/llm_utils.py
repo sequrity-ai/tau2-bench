@@ -1,6 +1,7 @@
 import json
 import re
 from typing import Any, Optional
+import os
 
 import litellm
 from litellm import completion, completion_cost
@@ -95,7 +96,7 @@ def get_response_cost(response: ModelResponse) -> float:
     try:
         cost = completion_cost(completion_response=response)
     except Exception as e:
-        logger.error(e)
+        #logger.error(e)
         return 0.0
     return cost
 
@@ -182,6 +183,7 @@ def generate(
     messages: list[Message],
     tools: Optional[list[Tool]] = None,
     tool_choice: Optional[str] = None,
+    who_from = None,
     **kwargs: Any,
 ) -> UserMessage | AssistantMessage:
     """
@@ -196,6 +198,9 @@ def generate(
 
     Returns: A tuple containing the message and the cost.
     """
+
+    kwargs["api_base"] = os.getenv("ENDPOINT_ADDRESS")
+
     if kwargs.get("num_retries") is None:
         kwargs["num_retries"] = DEFAULT_MAX_RETRIES
 
@@ -205,12 +210,62 @@ def generate(
     tools = [tool.openai_schema for tool in tools] if tools else None
     if tools and tool_choice is None:
         tool_choice = "auto"
+
+
+    #---------------
+    tool_policies = "" 
+    max_retry_attempts = 1
+    clear_history_every_n_attempts = 5
+    retry_on_policy_violation = True
+    allow_undefined_tools = True
+    fail_fast         = True
+    auto_gen_policies = False 
+    dual_llm_mode     = True 
+    strict_mode       = False 
+    max_nested_session_depth = 2
+    max_n_turns = 2
+    min_num_tools_for_filtering = 100
+    pllm_debug_info_level = "minimal" #"minimal", "normal", "extra"
+
+    headers={
+        "Content-Type": "application/json",
+        "Authorization" : f"Bearer {os.environ['X_Sequrity_Api_Key']}",
+        "X-Api-Key": os.environ["X_Api_Key"], 
+
+        "X-Security-Features":  json.dumps([
+          {"feature_name": "Dual LLM" if dual_llm_mode else "Single LLM", 
+              "config_json": json.dumps({"mode": "strict" if strict_mode else "standard"})}, # or strict
+          {"feature_name": "Long Program Support", "config_json": json.dumps({"mode": "base"})},
+        ]),
+
+        'X-Security-Config': json.dumps({
+          "min_num_tools_for_filtering": min_num_tools_for_filtering,
+          "cache_tool_result": "all", # "none"
+          "force_to_cache": [], # you can tell what tool calls can be cached
+          "max_pllm_attempts": max_retry_attempts,
+          "max_n_turns": max_n_turns,
+          "clear_history_every_n_attempts": clear_history_every_n_attempts,
+          "retry_on_policy_violation": retry_on_policy_violation,
+          "max_nested_session_depth": max_nested_session_depth,
+          "pllm_debug_info_level": pllm_debug_info_level,
+        }),
+
+        'X-Security-Policy': json.dumps({
+          "language": "sqrt",
+          "allow_undefined_tools": allow_undefined_tools,
+          "fail_fast": fail_fast,
+          "auto_gen": auto_gen_policies,
+          "codes": tool_policies
+        }),
+    }
+
     try:
         response = completion(
             model=model,
             messages=litellm_messages,
             tools=tools,
             tool_choice=tool_choice,
+            extra_headers=headers,
             **kwargs,
         )
     except Exception as e:
@@ -219,6 +274,7 @@ def generate(
     cost = get_response_cost(response)
     usage = get_response_usage(response)
     response = response.choices[0]
+
     try:
         finish_reason = response.finish_reason
         if finish_reason == "length":
