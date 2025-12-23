@@ -44,6 +44,7 @@ class InterfaceAgent:
         self.environment = environment
         self.llm = llm
         self.llm_args = deepcopy(llm_args) if llm_args is not None else {}
+        self.session_id = None
 
     @property
     def system_prompt(self) -> str:
@@ -63,22 +64,28 @@ class InterfaceAgent:
         user_message = UserMessage(role="user", content=message)
         message_history.append(user_message)
         messages = [system_message] + message_history
-        assistant_message = generate(
+        assistant_message, session_id = generate(
             model=self.llm,
             tools=self.environment.get_tools(),
             messages=messages,
+            who_from="INTERFACEBOT",
+            session_id = self.session_id,
             **self.llm_args,
         )
+        self.session_id = session_id
+
         while assistant_message.is_tool_call():
             message_history.append(assistant_message)
             for tool_call in assistant_message.tool_calls:
                 tool_message = self.environment.get_response(tool_call)
                 message_history.append(tool_message)
             messages = [system_message] + message_history
-            assistant_message = generate(
+            assistant_message, session_id = generate(
                 model=self.llm,
                 tools=self.environment.get_tools(),
                 messages=messages,
+                who_from="INTERFACEBOT",
+                session_id=self.session_id,
                 **self.llm_args,
             )
         message_history.append(assistant_message)

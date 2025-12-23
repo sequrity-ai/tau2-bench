@@ -112,11 +112,13 @@ class NLAssertionsEvaluator:
             UserMessage(role="user", content=user_prompt),
         ]
 
-        assistant_message = generate(
+        assistant_message, session_id = generate(
             model=DEFAULT_LLM_NL_ASSERTIONS,
             messages=messages,
+            who_from="ASSERTIONBOT",
             **DEFAULT_LLM_NL_ASSERTIONS_ARGS,
         )
+
         result_data = json.loads(assistant_message.content)
         return [
             NLAssertionCheck(

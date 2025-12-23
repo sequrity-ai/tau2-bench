@@ -66,6 +66,7 @@ class LLMAgent(LocalAgent[LLMAgentState]):
         super().__init__(tools=tools, domain_policy=domain_policy)
         self.llm = llm
         self.llm_args = deepcopy(llm_args) if llm_args is not None else {}
+        self.session_id = None
 
     @property
     def system_prompt(self) -> str:
@@ -105,12 +106,15 @@ class LLMAgent(LocalAgent[LLMAgentState]):
         else:
             state.messages.append(message)
         messages = state.system_messages + state.messages
-        assistant_message = generate(
+        assistant_message, session_id = generate(
             model=self.llm,
             tools=self.tools,
             messages=messages,
+            who_from = "BOT",
+            session_id = self.session_id,
             **self.llm_args,
         )
+        self.session_id = session_id
         state.messages.append(assistant_message)
         return assistant_message, state
 
@@ -179,6 +183,7 @@ class LLMGTAgent(LocalAgent[LLMAgentState]):
         self.llm = llm
         self.llm_args = deepcopy(llm_args) if llm_args is not None else {}
         self.provide_function_args = provide_function_args
+        self.session_id = session_id
 
     @classmethod
     def check_valid_task(cls, task: Task) -> bool:
@@ -233,12 +238,15 @@ class LLMGTAgent(LocalAgent[LLMAgentState]):
         else:
             state.messages.append(message)
         messages = state.system_messages + state.messages
-        assistant_message = generate(
+        assistant_message, session_id = generate(
             model=self.llm,
             tools=self.tools,
             messages=messages,
+            who_from="GTBOT",
+            session_id=self.session_id,
             **self.llm_args,
         )
+        self.session_id = session_id
         state.messages.append(assistant_message)
         return assistant_message, state
 
@@ -340,6 +348,7 @@ class LLMSoloAgent(LocalAgent[LLMAgentState]):
         self.llm_args = llm_args if llm_args is not None else {}
         self.add_stop_tool()
         self.validate_tools()
+        self.session_id = None
 
     def add_stop_tool(self) -> None:
         """Add the stop tool to the tools."""
@@ -453,13 +462,17 @@ class LLMSoloAgent(LocalAgent[LLMAgentState]):
         else:
             state.messages.append(message)
         messages = state.system_messages + state.messages
-        assistant_message = generate(
+        assistant_message, session_id = generate(
             model=self.llm,
             tools=self.tools,
             messages=messages,
             tool_choice="required",
+            who_from="SOLOBOT",
+            session_id = self.session_id
             **self.llm_args,
         )
+        self.session_id = session_id
+
         if not assistant_message.is_tool_call():
             raise ValueError("LLMSoloAgent only supports tool calls.")
         message = self._check_if_stop_toolcall(assistant_message)

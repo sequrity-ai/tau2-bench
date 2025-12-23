@@ -75,6 +75,7 @@ class UserSimulator(BaseUser):
     ):
         super().__init__(instructions=instructions, llm=llm, llm_args=llm_args)
         self.tools = tools
+        self.session_id = None
 
     @property
     def global_simulation_guidelines(self) -> str:
@@ -155,12 +156,16 @@ class UserSimulator(BaseUser):
         messages = state.system_messages + state.flip_roles()
 
         # Generate response
-        assistant_message = generate(
+        assistant_message, session_id = generate(
             model=self.llm,
             messages=messages,
             tools=self.tools,
+            who_from = "USER",
+            session_id=self.session_id,
             **self.llm_args,
         )
+
+        self.session_id = session_id
 
         user_response = assistant_message.content
         logger.debug(f"Response: {user_response}")

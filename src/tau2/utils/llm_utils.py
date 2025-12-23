@@ -4,6 +4,8 @@ from typing import Any, Optional
 import os
 
 import litellm
+litellm.return_response_headers = True
+
 from litellm import completion, completion_cost
 from litellm.caching.caching import Cache
 from litellm.main import ModelResponse, Usage
@@ -183,9 +185,16 @@ def generate(
     messages: list[Message],
     tools: Optional[list[Tool]] = None,
     tool_choice: Optional[str] = None,
-    who_from = None,
+    # USER if its a message from user, 
+    # BOT if the agent, 
+    # GTBOT if ground truth bot, 
+    # SOLOBOT if solobot, 
+    # INTERFACEBOT for interface bot, 
+    # ASSERTIONBOT for assertion evaluation
+    who_from = None, 
+    session_id = None,
     **kwargs: Any,
-) -> UserMessage | AssistantMessage:
+) -> (UserMessage | AssistantMessage, str):
     """
     Generate a response from the model.
 
@@ -220,12 +229,23 @@ def generate(
     allow_undefined_tools = True
     fail_fast         = True
     auto_gen_policies = False 
-    dual_llm_mode     = True 
+    dual_llm_mode     = False
     strict_mode       = False 
     max_nested_session_depth = 2
-    max_n_turns = 2
+    max_n_turns = 100
     min_num_tools_for_filtering = 100
     pllm_debug_info_level = "minimal" #"minimal", "normal", "extra"
+
+    # USER if its a message from user, 
+    # BOT if the agent, 
+    # GTBOT if ground truth bot, 
+    # SOLOBOT if solobot, 
+    # INTERFACEBOT for interface bot, 
+    # ASSERTIONBOT for assertion evaluation
+    if who_from in ["BOT"]:
+        dual_llm_mode = True
+    else:
+        dual_llm_mode = False
 
     headers={
         "Content-Type": "application/json",
@@ -252,16 +272,24 @@ def generate(
 
         'X-Security-Policy': json.dumps({
           "language": "sqrt",
-          "allow_undefined_tools": allow_undefined_tools,
           "fail_fast": fail_fast,
-          "auto_gen": auto_gen_policies,
-          "codes": tool_policies
+          "auto_gen":  auto_gen_policies,
+          "codes":     tool_policies,
+
+          "internal_policy_preset": {
+              "default_allow": allow_undefined_tools,
+              "enable_non_executable_memory": True,
+              "non_executable_memory_enforcement_level": "hard"
+          }
         }),
     }
 
+    if (session_id is not None) and dual_llm_mode:
+        headers["X-Session-ID"] = session_id
+
     try:
         response = completion(
-            model=model,
+            model=os.environ['X_Model_Type'], #model,
             messages=litellm_messages,
             tools=tools,
             tool_choice=tool_choice,
@@ -271,6 +299,9 @@ def generate(
     except Exception as e:
         logger.error(e)
         raise e
+    
+    session_id = response._response_headers.get('x-session-id', None)
+
     cost = get_response_cost(response)
     usage = get_response_usage(response)
     response = response.choices[0]
@@ -305,7 +336,7 @@ def generate(
         usage=usage,
         raw_data=response.to_dict(),
     )
-    return message
+    return (message, session_id)
 
 
 def get_cost(messages: list[Message]) -> tuple[float, float] | None:
