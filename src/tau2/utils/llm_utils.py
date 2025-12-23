@@ -5,6 +5,7 @@ import os
 
 import litellm
 litellm.return_response_headers = True
+litellm.suppress_debug_info = True
 
 from litellm import completion, completion_cost
 from litellm.caching.caching import Cache
@@ -223,7 +224,7 @@ def generate(
 
     #---------------
     tool_policies = "" 
-    max_retry_attempts = 1
+    max_retry_attempts = 10
     clear_history_every_n_attempts = 5
     retry_on_policy_violation = True
     allow_undefined_tools = True
@@ -231,6 +232,7 @@ def generate(
     auto_gen_policies = False 
     dual_llm_mode     = False
     strict_mode       = False 
+    multistepmode     = False
     max_nested_session_depth = 2
     max_n_turns = 100
     min_num_tools_for_filtering = 100
@@ -244,6 +246,7 @@ def generate(
     # ASSERTIONBOT for assertion evaluation
     if who_from in ["BOT"]:
         dual_llm_mode = True
+        multistepmode = True
     else:
         dual_llm_mode = False
 
@@ -254,8 +257,11 @@ def generate(
 
         "X-Security-Features":  json.dumps([
           {"feature_name": "Dual LLM" if dual_llm_mode else "Single LLM", 
-              "config_json": json.dumps({"mode": "strict" if strict_mode else "standard"})}, # or strict
-          {"feature_name": "Long Program Support", "config_json": json.dumps({"mode": "base"})},
+              "config_json": json.dumps(
+                  {"mode": "strict" if strict_mode else "standard"})}, # or strict
+          {"feature_name": "Long Program Support", 
+              "config_json": json.dumps(
+                  {"mode": "base"})},
         ]),
 
         'X-Security-Config': json.dumps({
@@ -268,6 +274,8 @@ def generate(
           "retry_on_policy_violation": retry_on_policy_violation,
           "max_nested_session_depth": max_nested_session_depth,
           "pllm_debug_info_level": pllm_debug_info_level,
+          "enable_multi_step_planning": multistepmode,
+          "interactive_mode": True,
         }),
 
         'X-Security-Policy': json.dumps({
@@ -284,7 +292,7 @@ def generate(
         }),
     }
 
-    if (session_id is not None) and dual_llm_mode:
+    if (session_id is not None):
         headers["X-Session-ID"] = session_id
 
     try:
