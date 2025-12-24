@@ -224,17 +224,17 @@ def generate(
 
     #---------------
     tool_policies = "" 
-    max_retry_attempts = 10
+    max_retry_attempts = 20
     clear_history_every_n_attempts = 5
     retry_on_policy_violation = True
-    allow_undefined_tools = True
-    fail_fast         = True
-    auto_gen_policies = False 
-    dual_llm_mode     = False
-    strict_mode       = False 
-    multistepmode     = False
+    allow_undefined_tools     = True
+    fail_fast                 = True
+    auto_gen_policies         = False 
+    dual_llm_mode             = False
+    strict_mode               = False 
+    multistepmode             = False
     max_nested_session_depth = 2
-    max_n_turns = 100
+    max_n_turns = 40
     min_num_tools_for_filtering = 100
     pllm_debug_info_level = "minimal" #"minimal", "normal", "extra"
 
@@ -246,7 +246,7 @@ def generate(
     # ASSERTIONBOT for assertion evaluation
     if who_from in ["BOT"]:
         dual_llm_mode = True
-        multistepmode = True
+        multistepmode = False
     else:
         dual_llm_mode = False
 
@@ -275,7 +275,9 @@ def generate(
           "max_nested_session_depth": max_nested_session_depth,
           "pllm_debug_info_level": pllm_debug_info_level,
           "enable_multi_step_planning": multistepmode,
+
           "interactive_mode": True,
+          "disable_rllm": True,
         }),
 
         'X-Security-Policy': json.dumps({
