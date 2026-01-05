@@ -233,6 +233,9 @@ def generate(
     dual_llm_mode             = False
     strict_mode               = False 
     multistepmode             = False
+    op_type = "best"
+    num_plans = 3
+
     max_nested_session_depth = 2
     max_n_turns = 40
     min_num_tools_for_filtering = 100
@@ -244,7 +247,7 @@ def generate(
     # SOLOBOT if solobot, 
     # INTERFACEBOT for interface bot, 
     # ASSERTIONBOT for assertion evaluation
-    if who_from in ["BOT"]:
+    if who_from in ["BOT", "SOLOBOT"]:
         dual_llm_mode = True
         multistepmode = False
     else:
@@ -276,6 +279,8 @@ def generate(
           "pllm_debug_info_level": pllm_debug_info_level,
           "enable_multi_step_planning": multistepmode,
 
+          "plan_reduction": op_type,
+          "n_plans": num_plans,
           "interactive_mode": True,
           "disable_rllm": True,
         }),

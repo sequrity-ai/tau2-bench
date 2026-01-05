@@ -468,7 +468,7 @@ class LLMSoloAgent(LocalAgent[LLMAgentState]):
             messages=messages,
             tool_choice="required",
             who_from="SOLOBOT",
-            session_id = self.session_id
+            session_id = self.session_id,
             **self.llm_args,
         )
         self.session_id = session_id
