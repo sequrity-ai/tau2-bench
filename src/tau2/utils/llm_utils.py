@@ -321,6 +321,17 @@ def generate(
     usage = get_response_usage(response)
     response = response.choices[0]
 
+    # unpacking our endpoint data structures 
+    try:
+        fieldname =  'final_return_value'
+        loadable = json.loads(response.message.content)
+
+        if fieldname in loadable:
+            frv = loadable[fieldname]['value']
+            response.message.content = json.dumps(frv)
+    except:
+        pass
+
     try:
         finish_reason = response.finish_reason
         if finish_reason == "length":
