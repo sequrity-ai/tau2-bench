@@ -13,6 +13,25 @@ from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field, create_model, field_serializer
 from typing_extensions import override
 
+import json
+import pydantic
+import types
+
+
+def get_output_desc(output_type)->str:
+    if issubclass(output_type, pydantic.BaseModel):
+        descriptor = str(output_type.schema_json())
+    elif typing.get_origin(output_type) in [list, types.UnionType]: 
+        descriptor = "["
+        for cl in typing.get_args(output_type):
+            descriptor += get_output_desc(cl) + ", "
+        descriptior = descriptor[:-1] + "]"
+    else:
+        descriptor = str(output_type)
+    
+    return descriptor
+
+
 
 class BaseTool(BaseModel, ABC):
     """The base class for a Tool that can be called by LLMs."""
@@ -135,18 +154,30 @@ class Tool(BaseTool):
         data["examples"] = doc.examples
         return data
 
+
     @override
     @property
     def openai_schema(self) -> dict:
         """Get the OpenAI schema of the tool."""
-        return {
+        desc = self._get_description()
+
+        if self.returns:
+            f_desc =  get_output_desc(self.returns)
+            desc += "\nOutput schema:" + f_desc + "\n"
+        
+        if self.raises:
+            desc += "\nErrors:" + str(self.raises) + "\n"
+
+
+        overall = {
             "type": "function",
             "function": {
                 "name": self.name,
-                "description": self._get_description(),
+                "description": desc,
                 "parameters": self.params.model_json_schema(),
             },
         }
+        return overall
 
     def to_str(self) -> str:
         """Represent the tool as a string."""

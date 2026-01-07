@@ -229,15 +229,18 @@ def generate(
     retry_on_policy_violation = True
     allow_undefined_tools     = True
     fail_fast                 = True
+
     auto_gen_policies         = False 
     dual_llm_mode             = False
     strict_mode               = False 
     multistepmode             = False
+
     op_type = "best"
-    num_plans = 3
+    num_plans = None
 
     max_nested_session_depth = 2
-    max_n_turns = 40
+    max_n_turns = 100
+
     min_num_tools_for_filtering = 100
     pllm_debug_info_level = "minimal" #"minimal", "normal", "extra"
 
@@ -269,19 +272,19 @@ def generate(
 
         'X-Security-Config': json.dumps({
           "min_num_tools_for_filtering": min_num_tools_for_filtering,
-          "cache_tool_result": "all", # "none"
+          "cache_tool_result": "none", #"all", # "none"
           "force_to_cache": [], # you can tell what tool calls can be cached
           "max_pllm_attempts": max_retry_attempts,
           "max_n_turns": max_n_turns,
           "clear_history_every_n_attempts": clear_history_every_n_attempts,
           "retry_on_policy_violation": retry_on_policy_violation,
-          "max_nested_session_depth": max_nested_session_depth,
+          #"max_nested_session_depth": max_nested_session_depth,
           "pllm_debug_info_level": pllm_debug_info_level,
           "enable_multi_step_planning": multistepmode,
 
           "plan_reduction": op_type,
           "n_plans": num_plans,
-          "interactive_mode": True,
+          #"interactive_mode": True,
           "disable_rllm": True,
         }),
 
@@ -302,8 +305,13 @@ def generate(
     if (session_id is not None):
         headers["X-Session-ID"] = session_id
 
+    if who_from not in ["BOT"]:
+        headers = {}
+        kwargs['api_base'] = os.environ['ENDPOINT_ADDRESS_FULL']
+
     try:
         response = completion(
+            reasoning_effort="low",
             model=os.environ['X_Model_Type'], #model,
             messages=litellm_messages,
             tools=tools,
@@ -322,15 +330,16 @@ def generate(
     response = response.choices[0]
 
     # unpacking our endpoint data structures 
-    try:
-        fieldname =  'final_return_value'
-        loadable = json.loads(response.message.content)
+    if False:
+        try:
+            fieldname =  'final_return_value'
+            loadable = json.loads(response.message.content)
 
-        if fieldname in loadable:
-            frv = loadable[fieldname]['value']
-            response.message.content = json.dumps(frv)
-    except:
-        pass
+            if fieldname in loadable:
+                frv = loadable[fieldname]['value']
+                response.message.content = json.dumps(frv)
+        except:
+            pass
 
     try:
         finish_reason = response.finish_reason
