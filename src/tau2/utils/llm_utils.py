@@ -286,6 +286,8 @@ def generate(
           "n_plans": num_plans,
           #"interactive_mode": True,
           "disable_rllm": True,
+          "pllm_can_ask_for_clarification": True,
+          "strip_final_return_value": True,
         }),
 
         'X-Security-Policy': json.dumps({

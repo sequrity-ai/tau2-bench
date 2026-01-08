@@ -20,7 +20,20 @@ import types
 
 def get_output_desc(output_type)->str:
     if issubclass(output_type, pydantic.BaseModel):
-        descriptor = str(output_type.schema_json())
+        try:
+            vals = json.loads(output_type.schema_json())
+            descriptor = ""
+            if 'properties' in vals:
+                if 'returns' in vals['properties']:
+                    if 'type' in vals['properties']['returns']:
+                        descriptor += "Tool returns: " + str(vals['properties']['returns']['type'])
+                    else:
+                        descriptor += "Tool returns: " + str(vals['properties']['returns'])
+            if '$defs' in vals:
+                descriptor += "Definitions for the return type: " + str(vals['$defs'])
+        except:
+            descriptor = str(output_type.schema_json())
+
     elif typing.get_origin(output_type) in [list, types.UnionType]: 
         descriptor = "["
         for cl in typing.get_args(output_type):
@@ -165,8 +178,8 @@ class Tool(BaseTool):
             f_desc =  get_output_desc(self.returns)
             desc += "\nOutput schema:" + f_desc + "\n"
         
-        if self.raises:
-            desc += "\nErrors:" + str(self.raises) + "\n"
+        #if self.raises:
+        #    desc += "\nErrors:" + str(self.raises) + "\n"
 
 
         overall = {
