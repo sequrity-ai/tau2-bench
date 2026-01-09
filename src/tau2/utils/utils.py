@@ -20,6 +20,7 @@ defence_params = {
     "allow_undefined_tools": True,
     "fail_fast": True,
     "enable_multistep_planning": False,
+
     "reasoning_effort": "low",  #"minimal" #"medium" # low
     "plan_reduction": "best", # "merge"
     "auto_gen_policies": False,
@@ -29,11 +30,11 @@ defence_params = {
 
     "strict_mode": False,
     "max_nested_session_depth": 1,
-    "min_num_tools_for_filtering": 2,
+    "min_num_tools_for_filtering": 100,
     "pllm_debug_info_level": "minimal", #"minimal", "normal", "extra"
 
-    "user_direct_model": False, # if for user the server should talk to the server directly
     "bot_direct_model": False,  # if for user the server should talk to the server directly
+    "user_direct_model": True, # if for user the server should talk to the server directly
 }
 
 res = load_dotenv()

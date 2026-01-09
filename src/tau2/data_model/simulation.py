@@ -23,7 +23,7 @@ from tau2.config import (
 from tau2.data_model.message import Message
 from tau2.data_model.tasks import Action, EnvAssertion, RewardType, Task
 from tau2.environment.environment import EnvironmentInfo
-from tau2.utils.utils import get_now
+from tau2.utils.utils import get_now, defence_params
 
 
 class RunConfig(BaseModel):
@@ -368,6 +368,8 @@ class Results(BaseModel):
     info: Info = Field(description="Information.")
     tasks: list[Task] = Field(description="The list of tasks.")
     simulations: list[SimulationRun] = Field(description="The list of simulations.")
+    defence_params: Optional[dict] = Field(
+            description="Defence Config.", default=defence_params)
 
     @classmethod
     def load(cls, path: Path) -> "Results":

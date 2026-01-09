@@ -26,7 +26,7 @@ from tau2.registry import RegistryInfo, registry
 from tau2.user.user_simulator import DummyUser, get_global_user_sim_guidelines
 from tau2.utils.display import ConsoleDisplay, Text
 from tau2.utils.pydantic_utils import get_pydantic_hash
-from tau2.utils.utils import DATA_DIR, get_commit_hash, get_now, show_dict_diff
+from tau2.utils.utils import DATA_DIR, get_commit_hash, get_now, show_dict_diff, defence_params
 
 
 def get_options() -> RegistryInfo:
@@ -112,6 +112,8 @@ def run_domain(config: RunConfig) -> Results:
     """
     Run simulations for a domain
     """
+    global defence_params
+
     config.validate()
     ConsoleDisplay.display_run_config(config)
     if config.task_set_name is None:
@@ -143,6 +145,7 @@ def run_domain(config: RunConfig) -> Results:
         )
         ConsoleDisplay.console.print(console_text)
 
+    ConsoleDisplay.console.print("Defence config:\n" + str(defence_params))
     num_trials = config.num_trials
     save_to = config.save_to
     if save_to is None:
