@@ -19,6 +19,8 @@ from tau2.data_model.simulation import RunConfig
 from tau2.run import get_options, run_domain
 from tau2.scripts.leaderboard.verify_trajectories import VerificationMode
 
+from tau2.utils.utils import defence_params as global_defence_params
+from tau2.utils.utils import smart_update_headers 
 
 def add_run_args(parser):
     """Add run arguments to a parser."""
@@ -141,13 +143,18 @@ def add_run_args(parser):
         default=False,
         help="Enforce communication protocol rules (e.g., no mixed messages with text and tool calls). Default is False.",
     )
+    parser.add_argument(
+        "--attack-config",
+        default=None
+    )
 
 
 def main():
+    global global_defence_params
     parser = argparse.ArgumentParser(description="Tau2 command line interface")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
-    # Run command
+       # Run command
     run_parser = subparsers.add_parser("run", help="Run a benchmark")
     add_run_args(run_parser)
     run_parser.set_defaults(
@@ -172,6 +179,7 @@ def main():
                 seed=args.seed,
                 log_level=args.log_level,
                 enforce_communication_protocol=args.enforce_communication_protocol,
+                attack_config = args.attack_config,
             )
         )
     )
@@ -310,6 +318,9 @@ def main():
     if not hasattr(args, "func"):
         parser.print_help()
         return
+
+    if args.attack_config is not None and args.attack_config != "none":
+        global_defence_params = smart_update_headers(global_defence_params, args.attack_config)
 
     args.func(args)
 

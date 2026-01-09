@@ -9,6 +9,33 @@ from deepdiff import DeepDiff
 from dotenv import load_dotenv
 from loguru import logger
 
+defence_params = {
+    "tool_policies": "",
+    "max_retry_attempts": 50,
+    "max_n_turns": 20,
+    "n_plans": None,
+    "multistepmode": False,
+    "clear_history_every_n_attempts": 4, # only works in single-step mode
+    "retry_on_policy_violation": True,
+    "allow_undefined_tools": True,
+    "fail_fast": True,
+    "enable_multistep_planning": False,
+    "reasoning_effort": "low",  #"minimal" #"medium" # low
+    "plan_reduction": "best", # "merge"
+    "auto_gen_policies": False,
+
+    "bot_dual_llm_mode": True,
+    "user_dual_llm_mode": False,
+
+    "strict_mode": False,
+    "max_nested_session_depth": 1,
+    "min_num_tools_for_filtering": 2,
+    "pllm_debug_info_level": "minimal", #"minimal", "normal", "extra"
+
+    "user_direct_model": False, # if for user the server should talk to the server directly
+    "bot_direct_model": False,  # if for user the server should talk to the server directly
+}
+
 res = load_dotenv()
 if not res:
     logger.warning("No .env file found")
@@ -81,3 +108,31 @@ def get_commit_hash() -> str:
         logger.error(f"Failed to get git hash: {e}")
         commit_hash = "unknown"
     return commit_hash
+
+
+import json
+
+def smart_update_headers(headers, flat_update_json):
+    """
+    Deserializes header values, searches for keys provided in 'flat_update_json',
+    updates them wherever they are found (nested dicts or lists), and reserializes.
+    
+    Args:
+        headers (dict): The dictionary of headers with JSON-string values.
+        flat_update_json (str): A JSON string of keys/values to update. 
+                                E.g., '{"max_n_turns": 99, "default_allow": false}'
+    """
+    
+    # 1. Deserialize the update payload
+    try:
+        updates = json.loads(flat_update_json)
+    except json.JSONDecodeError as e:
+        print(f"Error parsing update payload: {e}")
+        return headers
+
+    for update in updates:
+        if update not in headers:
+            raise Exception("Unsupported key " + str(update))
+        headers[update] = updates[update]
+
+    return headers

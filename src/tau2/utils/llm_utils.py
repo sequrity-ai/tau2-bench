@@ -33,6 +33,7 @@ from tau2.data_model.message import (
     UserMessage,
 )
 from tau2.environment.tool import Tool
+from .utils import defence_params
 
 # litellm._turn_on_debug()
 
@@ -209,6 +210,8 @@ def generate(
     Returns: A tuple containing the message and the cost.
     """
 
+    global defence_params 
+
     kwargs["api_base"] = os.getenv("ENDPOINT_ADDRESS")
 
     if kwargs.get("num_retries") is None:
@@ -223,26 +226,29 @@ def generate(
 
 
     #---------------
-    tool_policies = "" 
-    max_retry_attempts = 20
-    clear_history_every_n_attempts = 5
-    retry_on_policy_violation = True
-    allow_undefined_tools     = True
-    fail_fast                 = True
+    clear_history_every_n_attempts = defence_params['clear_history_every_n_attempts']
 
-    auto_gen_policies         = False 
-    dual_llm_mode             = False
-    strict_mode               = False 
-    multistepmode             = False
+    max_retry_attempts          = defence_params['max_retry_attempts']
+    tool_policies               = defence_params['tool_policies']
+    retry_on_policy_violation   = defence_params['retry_on_policy_violation']
+    allow_undefined_tools       = defence_params['allow_undefined_tools']
+    fail_fast                   = defence_params['fail_fast']
 
-    op_type = "best"
-    num_plans = None
+    auto_gen_policies           = defence_params['auto_gen_policies']
+    bot_dual_llm_mode           = defence_params['bot_dual_llm_mode']
+    user_dual_llm_mode          = defence_params['user_dual_llm_mode']
 
-    max_nested_session_depth = 2
-    max_n_turns = 100
+    strict_mode                 = defence_params['strict_mode']
+    multistepmode               = defence_params['multistepmode']
 
-    min_num_tools_for_filtering = 100
-    pllm_debug_info_level = "minimal" #"minimal", "normal", "extra"
+    op_type                     = defence_params['plan_reduction']
+    num_plans                   = defence_params['n_plans']
+
+    max_nested_session_depth    = defence_params['max_nested_session_depth']
+    max_n_turns                 = defence_params['max_n_turns']
+    reasoning_effort            = defence_params['reasoning_effort']
+    pllm_debug_info_level       = defence_params['pllm_debug_info_level']
+    min_num_tools_for_filtering = defence_params['min_num_tools_for_filtering']
 
     # USER if its a message from user, 
     # BOT if the agent, 
@@ -251,10 +257,9 @@ def generate(
     # INTERFACEBOT for interface bot, 
     # ASSERTIONBOT for assertion evaluation
     if who_from in ["BOT", "SOLOBOT"]:
-        dual_llm_mode = True
-        multistepmode = False
+        dual_llm_mode = bot_dual_llm_mode
     else:
-        dual_llm_mode = False
+        dual_llm_mode = user_dual_llm_mode 
 
     headers={
         "Content-Type": "application/json",
@@ -307,13 +312,18 @@ def generate(
     if (session_id is not None):
         headers["X-Session-ID"] = session_id
 
-    if who_from not in ["BOT"]:
+    
+    if who_from in ["USER",] and defence_params['user_direct_model']:
+        headers = {}
+        kwargs['api_base'] = os.environ['ENDPOINT_ADDRESS_FULL']
+
+    if who_from in ["BOT",] and defence_params['bot_direct_model']:
         headers = {}
         kwargs['api_base'] = os.environ['ENDPOINT_ADDRESS_FULL']
 
     try:
         response = completion(
-            reasoning_effort="low",
+            reasoning_effort=reasoning_effort,
             model=os.environ['X_Model_Type'], #model,
             messages=litellm_messages,
             tools=tools,

@@ -8,6 +8,8 @@ from experiments.hyperparam.run_eval import RunMode, make_configs, run_evals
 from tau2.scripts.view_simulations import main as view_simulations_main
 from tau2.utils.utils import DATA_DIR
 
+from tau2.utils.utils import smart_update_headers
+
 DATA_EXP_DIR = DATA_DIR / "exp"
 
 DEFAULT_LLM_SUPERVISOR = None
@@ -125,6 +127,10 @@ def get_cli_parser() -> argparse.ArgumentParser:
         default=json.dumps(DEFAULT_LLM_USER_ARGS),
         help=f"JSON string of arguments for user LLM. Default is {DEFAULT_LLM_USER_ARGS}.",
     )
+    run_parser.add_argument(
+        "--attack-config",
+        default=None,
+    )
 
     # Analyze results subparser
     analyze_parser = subparsers.add_parser(
@@ -171,10 +177,12 @@ def main():
     """
     Run the evaluations or analyze results based on the command.
     """
+
     parser = get_cli_parser()
     args = parser.parse_args()
 
     if args.command == "run-evals":
+
         # Convert relative path to absolute path using DATA_EXP_DIR
         exp_dir = DATA_EXP_DIR / args.exp_dir
 
