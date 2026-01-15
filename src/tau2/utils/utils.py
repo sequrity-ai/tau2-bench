@@ -11,11 +11,11 @@ from loguru import logger
 
 defence_params = {
     "tool_policies": "",
-    "max_retry_attempts": 50,
-    "max_n_turns": 20,
+    "max_retry_attempts": 20,
+    "max_n_turns": 100,
     "n_plans": None,
     "multistepmode": False,
-    "clear_history_every_n_attempts": 4, # only works in single-step mode
+    "clear_history_every_n_attempts": 5, # only works in single-step mode
     "retry_on_policy_violation": True,
     "allow_undefined_tools": True,
     "fail_fast": True,

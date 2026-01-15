@@ -319,8 +319,9 @@ def main():
         parser.print_help()
         return
 
-    if args.attack_config is not None and args.attack_config != "none":
-        global_defence_params = smart_update_headers(global_defence_params, args.attack_config)
+    if hasattr(args, "attack_config"):
+        if args.attack_config is not None and args.attack_config != "none":
+            global_defence_params = smart_update_headers(global_defence_params, args.attack_config)
 
     args.func(args)
 

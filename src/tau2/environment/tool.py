@@ -25,10 +25,14 @@ def get_output_desc(output_type)->str:
             descriptor = ""
             if 'properties' in vals:
                 if 'returns' in vals['properties']:
-                    if 'type' in vals['properties']['returns']:
-                        descriptor += "Tool returns: " + str(vals['properties']['returns']['type'])
-                    else:
-                        descriptor += "Tool returns: " + str(vals['properties']['returns'])
+                    descriptor += "Returns: " + str(vals['properties']['returns'])
+                    #if 'type' in vals['properties']['returns']:
+                    #    if "description" in vals['properties']['returns']:
+                    #        descriptor += "Description:" + str(vals['properties']['returns']['description'])  + "; "
+                    #    if "description" in vals['properties']['type']:
+                    #        descriptor += "Return type: " + str(vals['properties']['returns']['type']) + "; "
+                    #else:
+                    #    descriptor += "Return type: " + str(vals['properties']['returns'])
             if '$defs' in vals:
                 descriptor += "Definitions for the return type: " + str(vals['$defs'])
         except:
@@ -176,11 +180,10 @@ class Tool(BaseTool):
 
         if self.returns:
             f_desc =  get_output_desc(self.returns)
-            desc += "\nOutput schema:" + f_desc + "\n"
+            desc += "\n" + f_desc + "\n"
         
         #if self.raises:
         #    desc += "\nErrors:" + str(self.raises) + "\n"
-
 
         overall = {
             "type": "function",

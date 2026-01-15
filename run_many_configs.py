@@ -32,7 +32,7 @@ num_tasks = 30
 
 suites = ['telecom', 'airline', 'retail']
 
-base_cmd = "tau2 run --domain {domain} --agent-llm {agent} --user-llm {user} --num-trials {ntrials} --max-concurrency {nconc} --num-tasks {ntasks} --save-to {saveto} --attack-config '{atkconfig}'"
+base_cmd = "tau2 run --domain {domain} --agent-llm {agent} --user-llm {user} --num-trials {ntrials} --max-concurrency {nconc} --num-tasks {ntasks} --save-to {saveto} --attack-config '{atkconfig}' --enforce-communication-protocol"
 
 configs = []
 

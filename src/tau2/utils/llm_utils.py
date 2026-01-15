@@ -258,7 +258,8 @@ def generate(
     # ASSERTIONBOT for assertion evaluation
     if who_from in ["BOT", "SOLOBOT"]:
         dual_llm_mode = bot_dual_llm_mode
-    else:
+
+    if who_from in ['USER']:
         dual_llm_mode = user_dual_llm_mode 
 
     headers={
@@ -310,21 +311,20 @@ def generate(
     }
 
     if (session_id is not None):
-        headers["X-Session-ID"] = session_id
+        headers["x-session-id"] = session_id
 
-    
-    if who_from in ["USER",] and defence_params['user_direct_model']:
+    if (who_from in ["USER",]) and defence_params['user_direct_model']:
         headers = {}
         kwargs['api_base'] = os.environ['ENDPOINT_ADDRESS_FULL']
 
-    if who_from in ["BOT",] and defence_params['bot_direct_model']:
+    if (who_from in ["BOT",]) and defence_params['bot_direct_model']:
         headers = {}
         kwargs['api_base'] = os.environ['ENDPOINT_ADDRESS_FULL']
 
     try:
         response = completion(
             reasoning_effort=reasoning_effort,
-            model=os.environ['X_Model_Type'], #model,
+            model=model,
             messages=litellm_messages,
             tools=tools,
             tool_choice=tool_choice,
