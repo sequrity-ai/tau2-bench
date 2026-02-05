@@ -245,20 +245,81 @@ class Tau2PromptOptimizer:
         """
         seed_prompt = initial_prompt or self.client.pllm_prompt or ""
 
-        # Create evaluator function
+        # Create evaluator function that runs full tau2 simulations
+        # Track simulation results for saving
+        optimization_sim_results = []
+
         def evaluator(prompt: str, example: Any) -> float:
-            # Create a new client with this prompt
-            test_client = self.client.with_pllm_prompt(prompt)
+            """Run a full tau2 simulation and return the reward score."""
+            from tau2.run import run_task
+            from tau2.utils.utils import defence_params
 
             try:
-                # Get the query from example
-                query = getattr(example, "user_message", None)
-                if query is None:
-                    query = getattr(example, "query", str(example))
+                # Extract task from example
+                task = example.get("task") if isinstance(example, dict) else getattr(example, "task", None)
+                if task is None:
+                    print("[GEPA Evaluator] Error: No task found in example")
+                    return 0.0
 
-                response = test_client.call_and_parse(prompt=query)
-                return self.metric(example, response)
-            except Exception:
+                # Get domain from task
+                domain = task.domain if hasattr(task, "domain") else example.get("domain", "mock")
+
+                # Temporarily update defence_params with the test prompt
+                # This gets picked up by generate() in llm_utils.py
+                old_prompt = defence_params.get("pllm_prompt", "")
+                defence_params["pllm_prompt"] = prompt
+
+                # Debug: Confirm prompt is set
+                print(f"[GEPA Evaluator] Testing task {task.id} with prompt (first 100 chars): {prompt[:100]}...")
+
+                # Run the simulation
+                # The agent will use defence_params["pllm_prompt"] via generate()
+                sim_result = run_task(
+                    domain=domain,
+                    task=task,
+                    agent="llm_agent",  # Use standard LLM agent
+                    user="user_simulator",  # Use simulated user
+                    llm_agent=self.client.model,
+                    llm_args_agent={"temperature": 0.0},
+                    llm_user=self.client.model,
+                    llm_args_user={"temperature": 0.0},
+                    max_steps=20,  # Limit steps for faster evaluation
+                    max_errors=5,
+                )
+
+                # Save simulation result for later viewing
+                optimization_sim_results.append({
+                    "task_id": task.id,
+                    "prompt_preview": prompt[:200],
+                    "sim_result": sim_result,
+                    "reward": sim_result.reward_info.reward if sim_result.reward_info else 0.0,
+                })
+
+                # Restore original prompt
+                defence_params["pllm_prompt"] = old_prompt
+
+                # Debug reward extraction
+                if sim_result.reward_info:
+                    reward = sim_result.reward_info.reward
+                    print(f"[GEPA Evaluator] Task {task.id} completed. Reward: {reward}")
+                    if hasattr(sim_result.reward_info, 'reward_breakdown'):
+                        print(f"[GEPA Evaluator] Reward breakdown: {sim_result.reward_info.reward_breakdown}")
+                else:
+                    print(f"[GEPA Evaluator] WARNING: Task {task.id} has no reward_info!")
+                    print(f"[GEPA Evaluator] sim_result type: {type(sim_result)}")
+                    print(f"[GEPA Evaluator] sim_result attributes: {dir(sim_result)}")
+                    reward = 0.0
+
+                # Debug: show final message count
+                if hasattr(sim_result, 'messages'):
+                    print(f"[GEPA Evaluator] Simulation had {len(sim_result.messages)} messages")
+
+                return reward
+
+            except Exception as e:
+                print(f"[GEPA Evaluator] Evaluation error: {e}")
+                import traceback
+                traceback.print_exc()
                 return 0.0
 
         # Create GEPA strategy
@@ -275,12 +336,47 @@ class Tau2PromptOptimizer:
         # Update client with best prompt
         self.client.pllm_prompt = gepa_result.best_prompt
 
+        # Save optimization simulation results to file
+        import json
+        from pathlib import Path
+        import datetime
+
+        output_dir = Path("/home/ubuntu/tau2-bench/data/tau2/optimization_runs")
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        results_file = output_dir / f"optimization_{timestamp}.json"
+
+        # Save detailed results
+        save_data = {
+            "timestamp": timestamp,
+            "best_score": gepa_result.best_score,
+            "best_prompt": gepa_result.best_prompt,
+            "simulations": [
+                {
+                    "task_id": sim["task_id"],
+                    "prompt_preview": sim["prompt_preview"],
+                    "reward": sim["reward"],
+                    "messages": [msg.to_dict() if hasattr(msg, "to_dict") else str(msg)
+                                for msg in sim["sim_result"].messages] if hasattr(sim["sim_result"], "messages") else [],
+                }
+                for sim in optimization_sim_results
+            ]
+        }
+
+        with open(results_file, "w") as f:
+            json.dump(save_data, f, indent=2, default=str)
+
+        print(f"[GEPA] Saved {len(optimization_sim_results)} simulation runs to: {results_file}")
+
         return OptimizationResult(
             best_prompt=gepa_result.best_prompt,
             best_score=gepa_result.best_score,
             metadata={
                 "strategy": "GEPA",
-                "gepa_result": gepa_result.result,
+                "num_simulations": len(optimization_sim_results),
+                "results_file": str(results_file),
+                # Don't include gepa_result.result - it's not JSON serializable
             },
         )
 

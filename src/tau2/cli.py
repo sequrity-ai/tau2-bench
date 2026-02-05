@@ -383,6 +383,19 @@ def main():
         help="Output path for the optimized prompt JSON file.",
     )
     optimize_parser.add_argument(
+        "--reflection-lm",
+        type=str,
+        default=None,
+        help="Model to use for GEPA reflection (e.g., 'gpt-5-mini'). If not provided, uses simple fallback proposer.",
+    )
+    optimize_parser.add_argument(
+        "--log-level",
+        type=str,
+        default="ERROR",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        help="Log level for tau2 logger. Default is 'ERROR'.",
+    )
+    optimize_parser.add_argument(
         "--debug",
         action="store_true",
         help="Enable debug output.",
@@ -482,8 +495,14 @@ def run_optimize(args):
     """Run DSPy prompt optimization."""
     from pathlib import Path
 
+    from loguru import logger
+
     from tau2.dspy.config import OptimizationConfig, StrategyType
     from tau2.dspy.optimize import optimize_agent_prompt
+
+    # Configure logger level
+    logger.remove()  # Remove default handlers
+    logger.add(lambda msg: print(msg), level=args.log_level)
 
     # Convert strategy string to enum
     strategy = StrategyType(args.strategy)
@@ -493,6 +512,7 @@ def run_optimize(args):
     opt_config = OptimizationConfig(
         max_iterations=args.max_iterations,
         max_metric_calls=args.max_iterations * 5,  # GEPA needs more metric calls
+        reflection_lm=args.reflection_lm,  # Model for GEPA reflection
     )
 
     # Determine output path

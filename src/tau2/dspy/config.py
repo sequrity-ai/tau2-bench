@@ -35,7 +35,7 @@ class OptimizationConfig:
 
     # GEPA-specific
     max_metric_calls: int = 50  # Default stopping condition for GEPA
-    reflection_lm: str | None = None
+    reflection_lm: str | None = "gpt-5-mini"
     skip_perfect_score: bool = True
     display_progress_bar: bool = True
 

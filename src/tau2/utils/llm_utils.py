@@ -331,6 +331,17 @@ def generate(
         headers = {}
         kwargs['api_base'] = os.environ['ENDPOINT_ADDRESS_FULL']
 
+    # Log the pllm_prompt being sent to Security-API (if not minimal debug level)
+    if pllm_debug_info_level != "minimal" and effective_pllm_prompt:
+        import datetime
+        debug_file = "/home/ubuntu/tau2-bench/pllm_debug.log"
+        with open(debug_file, "a") as f:
+            timestamp = datetime.datetime.now().isoformat()
+            f.write(f"\n{'='*80}\n")
+            f.write(f"[{timestamp}] PLLM Prompt Sent to Security-API (who_from={who_from})\n")
+            f.write(f"Model: {model}\n")
+            f.write(f"--- PLLM PROMPT ---\n{effective_pllm_prompt}\n--- END PLLM PROMPT ---\n")
+
     try:
         response = completion(
             reasoning_effort=reasoning_effort,

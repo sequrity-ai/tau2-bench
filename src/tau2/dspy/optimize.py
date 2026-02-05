@@ -319,11 +319,17 @@ You are an expert Python code generator acting as the execution engine for a hel
     logger.info(f"Optimization complete. Best score: {opt_result.best_score}")
 
     # Create result
+    # Convert strategy enum to string
+    if isinstance(strategy, StrategyType):
+        strategy_str = strategy.value
+    else:
+        strategy_str = str(strategy)
+
     result = OptimizationResult(
         domain=domain,
         best_prompt=opt_result.best_prompt,
         best_score=opt_result.best_score,
-        strategy=str(strategy),
+        strategy=strategy_str,
         model=model,
         train_size=len(trainset),
         val_size=len(valset) if valset else 0,
