@@ -284,16 +284,18 @@ def generate(
           "max_n_turns": max_n_turns,
           "clear_history_every_n_attempts": clear_history_every_n_attempts,
           "retry_on_policy_violation": retry_on_policy_violation,
-          #"max_nested_session_depth": max_nested_session_depth,
           "pllm_debug_info_level": pllm_debug_info_level,
           "enable_multi_step_planning": multistepmode,
 
-          "plan_reduction": op_type,
-          "n_plans": num_plans,
-          #"interactive_mode": True,
+          #"plan_reduction": op_type,
+          #"n_plans": num_plans,
           "disable_rllm": True,
           "pllm_can_ask_for_clarification": True,
-          "strip_final_return_value": True,
+          "show_pllm_secure_var_values": "basic-notext",
+          "response_format": {
+            "strip_response_content": True,
+            "include_program": False
+          }
         }),
 
         'X-Security-Policy': json.dumps({
@@ -305,7 +307,6 @@ def generate(
           "internal_policy_preset": {
               "default_allow": allow_undefined_tools,
               "enable_non_executable_memory": True,
-              "non_executable_memory_enforcement_level": "hard"
           }
         }),
     }
