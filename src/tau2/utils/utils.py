@@ -31,10 +31,13 @@ defence_params = {
     "strict_mode": False,
     "max_nested_session_depth": 1,
     "min_num_tools_for_filtering": 100,
-    "pllm_debug_info_level": "minimal", #"minimal", "normal", "extra"
+    "pllm_debug_info_level": "extra", #"minimal", "normal", "extra"
 
     "bot_direct_model": False,  # if for user the server should talk to the server directly
     "user_direct_model": True, # if for user the server should talk to the server directly
+
+    # PLLM prompt for DSPy optimization
+    "pllm_prompt": "",  # If set, overrides the default PLLM system prompt
 }
 
 res = load_dotenv()
@@ -117,13 +120,13 @@ def smart_update_headers(headers, flat_update_json):
     """
     Deserializes header values, searches for keys provided in 'flat_update_json',
     updates them wherever they are found (nested dicts or lists), and reserializes.
-    
+
     Args:
         headers (dict): The dictionary of headers with JSON-string values.
-        flat_update_json (str): A JSON string of keys/values to update. 
+        flat_update_json (str): A JSON string of keys/values to update.
                                 E.g., '{"max_n_turns": 99, "default_allow": false}'
     """
-    
+
     # 1. Deserialize the update payload
     try:
         updates = json.loads(flat_update_json)

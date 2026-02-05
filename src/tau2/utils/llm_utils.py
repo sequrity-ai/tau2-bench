@@ -187,14 +187,15 @@ def generate(
     messages: list[Message],
     tools: Optional[list[Tool]] = None,
     tool_choice: Optional[str] = None,
-    # USER if its a message from user, 
-    # BOT if the agent, 
-    # GTBOT if ground truth bot, 
-    # SOLOBOT if solobot, 
-    # INTERFACEBOT for interface bot, 
+    # USER if its a message from user,
+    # BOT if the agent,
+    # GTBOT if ground truth bot,
+    # SOLOBOT if solobot,
+    # INTERFACEBOT for interface bot,
     # ASSERTIONBOT for assertion evaluation
-    who_from = None, 
+    who_from = None,
     session_id = None,
+    pllm_prompt: Optional[str] = None,  # Override PLLM system prompt for optimization
     **kwargs: Any,
 ) -> (UserMessage | AssistantMessage, str):
     """
@@ -210,7 +211,7 @@ def generate(
     Returns: A tuple containing the message and the cost.
     """
 
-    global defence_params 
+    global defence_params
 
     kwargs["api_base"] = os.getenv("ENDPOINT_ADDRESS")
 
@@ -250,28 +251,31 @@ def generate(
     pllm_debug_info_level       = defence_params['pllm_debug_info_level']
     min_num_tools_for_filtering = defence_params['min_num_tools_for_filtering']
 
-    # USER if its a message from user, 
-    # BOT if the agent, 
-    # GTBOT if ground truth bot, 
-    # SOLOBOT if solobot, 
-    # INTERFACEBOT for interface bot, 
+    # Use pllm_prompt from parameter if provided, otherwise from defence_params
+    effective_pllm_prompt = pllm_prompt if pllm_prompt is not None else defence_params.get('pllm_prompt')
+
+    # USER if its a message from user,
+    # BOT if the agent,
+    # GTBOT if ground truth bot,
+    # SOLOBOT if solobot,
+    # INTERFACEBOT for interface bot,
     # ASSERTIONBOT for assertion evaluation
     if who_from in ["BOT", "SOLOBOT"]:
         dual_llm_mode = bot_dual_llm_mode
 
     if who_from in ['USER']:
-        dual_llm_mode = user_dual_llm_mode 
+        dual_llm_mode = user_dual_llm_mode
 
     headers={
         "Content-Type": "application/json",
         "Authorization" : f"Bearer {os.environ['X_Sequrity_Api_Key']}",
-        "X-Api-Key": os.environ["X_Api_Key"], 
+        "X-Api-Key": os.environ["X_Api_Key"],
 
         "X-Security-Features":  json.dumps([
-          {"feature_name": "Dual LLM" if dual_llm_mode else "Single LLM", 
+          {"feature_name": "Dual LLM" if dual_llm_mode else "Single LLM",
               "config_json": json.dumps(
                   {"mode": "strict" if strict_mode else "standard"})}, # or strict
-          {"feature_name": "Long Program Support", 
+          {"feature_name": "Long Program Support",
               "config_json": json.dumps(
                   {"mode": "base"})},
         ]),
@@ -288,12 +292,19 @@ def generate(
           "pllm_debug_info_level": pllm_debug_info_level,
           "enable_multi_step_planning": multistepmode,
 
-          "plan_reduction": op_type,
-          "n_plans": num_plans,
+        #   "plan_reduction": op_type,
+        #   "n_plans": num_plans,
           #"interactive_mode": True,
           "disable_rllm": True,
           "pllm_can_ask_for_clarification": True,
-          "strip_final_return_value": True,
+        #   "strip_final_return_value": True,
+          # PLLM prompt override for DSPy optimization
+          **({"overwrite_pllm_prompt": effective_pllm_prompt} if effective_pllm_prompt else {}),
+          # Response format configuration - include program and namespace for debugging
+          "response_format": {
+            "include_program": True,
+            "include_namespace_snapshot": True,
+          },
         }),
 
         'X-Security-Policy': json.dumps({
@@ -305,7 +316,6 @@ def generate(
           "internal_policy_preset": {
               "default_allow": allow_undefined_tools,
               "enable_non_executable_memory": True,
-              "non_executable_memory_enforcement_level": "hard"
           }
         }),
     }
@@ -334,14 +344,40 @@ def generate(
     except Exception as e:
         logger.error(e)
         raise e
-    
+
     session_id = response._response_headers.get('x-session-id', None)
 
     cost = get_response_cost(response)
     usage = get_response_usage(response)
     response = response.choices[0]
 
-    # unpacking our endpoint data structures 
+    # Save PLLM debug info to file if level is not minimal
+    if pllm_debug_info_level != "minimal":
+        import datetime
+        debug_file = "/home/ubuntu/tau2-bench/pllm_debug.log"
+        with open(debug_file, "a") as f:
+            timestamp = datetime.datetime.now().isoformat()
+            f.write(f"\n{'='*80}\n")
+            f.write(f"[{timestamp}] PLLM Response (debug_level={pllm_debug_info_level})\n")
+            f.write(f"pllm_prompt: {effective_pllm_prompt}\n")
+
+            # Try to extract program field from response content
+            response_dict = response.to_dict()
+            content = response_dict.get("message", {}).get("content", "")
+            try:
+                parsed_content = json.loads(content) if content else {}
+                if "program" in parsed_content:
+                    f.write(f"\n--- PROGRAM ---\n{parsed_content['program']}\n--- END PROGRAM ---\n")
+                if "final_return_value" in parsed_content:
+                    f.write(f"\nfinal_return_value: {parsed_content['final_return_value']}\n")
+                if "namespace_snapshot" in parsed_content:
+                    f.write(f"\nnamespace_snapshot: {json.dumps(parsed_content['namespace_snapshot'], indent=2)}\n")
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+            f.write(f"\nFull Response: {json.dumps(response_dict, indent=2)}\n")
+
+    # unpacking our endpoint data structures
     if False:
         try:
             fieldname =  'final_return_value'

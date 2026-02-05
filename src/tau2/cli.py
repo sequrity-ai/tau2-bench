@@ -314,6 +314,81 @@ def main():
     )
     submit_verify_parser.set_defaults(func=lambda args: run_verify_trajectories(args))
 
+    # Optimize command - DSPy prompt optimization
+    optimize_parser = subparsers.add_parser(
+        "optimize", help="Optimize agent prompts using DSPy/GEPA"
+    )
+    optimize_parser.add_argument(
+        "--domain",
+        "-d",
+        type=str,
+        required=True,
+        choices=get_options().domains,
+        help="The domain to optimize the prompt for",
+    )
+    optimize_parser.add_argument(
+        "--strategy",
+        type=str,
+        default="gepa",
+        choices=["bootstrap", "bootstrap_rs", "mipro", "gepa"],
+        help="Optimization strategy to use. Default is 'gepa'.",
+    )
+    optimize_parser.add_argument(
+        "--model",
+        type=str,
+        default=DEFAULT_LLM_AGENT,
+        help=f"The LLM to use. Default is {DEFAULT_LLM_AGENT}.",
+    )
+    optimize_parser.add_argument(
+        "--train-split",
+        type=str,
+        default="train",
+        help="Task split to use for training. Default is 'train'.",
+    )
+    optimize_parser.add_argument(
+        "--val-split",
+        type=str,
+        default="test",
+        help="Task split to use for validation. Default is 'test'.",
+    )
+    optimize_parser.add_argument(
+        "--task-set-name",
+        type=str,
+        default=None,
+        help="Override the task set name.",
+    )
+    optimize_parser.add_argument(
+        "--max-train-tasks",
+        type=int,
+        default=None,
+        help="Maximum number of training tasks to use.",
+    )
+    optimize_parser.add_argument(
+        "--max-val-tasks",
+        type=int,
+        default=None,
+        help="Maximum number of validation tasks to use.",
+    )
+    optimize_parser.add_argument(
+        "--max-iterations",
+        type=int,
+        default=10,
+        help="Maximum optimization iterations. Default is 10.",
+    )
+    optimize_parser.add_argument(
+        "--output",
+        "-o",
+        type=str,
+        default=None,
+        help="Output path for the optimized prompt JSON file.",
+    )
+    optimize_parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable debug output.",
+    )
+    optimize_parser.set_defaults(func=lambda args: run_optimize(args))
+
     args = parser.parse_args()
     if not hasattr(args, "func"):
         parser.print_help()
@@ -401,6 +476,57 @@ def run_manual_mode():
     from tau2.scripts.manual_mode import main as manual_main
 
     manual_main()
+
+
+def run_optimize(args):
+    """Run DSPy prompt optimization."""
+    from pathlib import Path
+
+    from tau2.dspy.config import OptimizationConfig, StrategyType
+    from tau2.dspy.optimize import optimize_agent_prompt
+
+    # Convert strategy string to enum
+    strategy = StrategyType(args.strategy)
+
+    # Create optimization config
+    # For GEPA, max_iterations maps to max_metric_calls
+    opt_config = OptimizationConfig(
+        max_iterations=args.max_iterations,
+        max_metric_calls=args.max_iterations * 5,  # GEPA needs more metric calls
+    )
+
+    # Determine output path
+    output_path = Path(args.output) if args.output else None
+
+    # Run optimization
+    result = optimize_agent_prompt(
+        domain=args.domain,
+        strategy=strategy,
+        model=args.model,
+        train_split=args.train_split,
+        val_split=args.val_split,
+        task_set_name=args.task_set_name,
+        max_train_tasks=args.max_train_tasks,
+        max_val_tasks=args.max_val_tasks,
+        optimization_config=opt_config,
+        output_path=output_path,
+        debug=args.debug,
+    )
+
+    # Print results
+    print(f"\nOptimization complete!")
+    print(f"Domain: {result.domain}")
+    print(f"Strategy: {result.strategy}")
+    print(f"Best Score: {result.best_score:.4f}")
+    print(f"Training examples: {result.train_size}")
+    print(f"Validation examples: {result.val_size}")
+
+    # Save if no output path was provided (use default)
+    if output_path is None:
+        saved_path = result.save()
+        print(f"\nOptimized prompt saved to: {saved_path}")
+    else:
+        print(f"\nOptimized prompt saved to: {output_path}")
 
 
 if __name__ == "__main__":
