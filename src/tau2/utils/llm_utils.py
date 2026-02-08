@@ -246,7 +246,11 @@ def generate(
 
     max_nested_session_depth    = defence_params['max_nested_session_depth']
     max_n_turns                 = defence_params['max_n_turns']
-    reasoning_effort            = defence_params['reasoning_effort']
+
+    
+    reasoning_effort_user       = defence_params['reasoning_effort_user']
+    reasoning_effort_bot        = defence_params['reasoning_effort_bot']
+
     pllm_debug_info_level       = defence_params['pllm_debug_info_level']
     min_num_tools_for_filtering = defence_params['min_num_tools_for_filtering']
 
@@ -258,9 +262,11 @@ def generate(
     # ASSERTIONBOT for assertion evaluation
     if who_from in ["BOT", "SOLOBOT"]:
         dual_llm_mode = bot_dual_llm_mode
+        reasoning_effort = reasoning_effort_bot
 
     if who_from in ['USER']:
         dual_llm_mode = user_dual_llm_mode 
+        reasoning_effort = reasoning_effort_user
 
     headers={
         "Content-Type": "application/json",
