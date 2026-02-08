@@ -21,7 +21,8 @@ defence_params = {
     "fail_fast": True,
     "enable_multistep_planning": False,
 
-    "reasoning_effort": "low",  #"minimal" #"medium" # low
+    "reasoning_effort_user": "low",  #"minimal" #"medium" # low
+    "reasoning_effort_bot":  "low",  #"minimal" #"medium" # low
     "plan_reduction": "best", # "merge"
     "auto_gen_policies": False,
 
