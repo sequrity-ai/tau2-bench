@@ -10,6 +10,7 @@ from tau2.config import (
     DEFAULT_LOG_LEVEL,
     DEFAULT_MAX_CONCURRENCY,
     DEFAULT_MAX_ERRORS,
+    DEFAULT_MAX_DURATION,
     DEFAULT_MAX_STEPS,
     DEFAULT_NUM_TRIALS,
     DEFAULT_SEED,
@@ -108,6 +109,12 @@ def add_run_args(parser):
         help=f"The maximum number of steps to run the simulation. Default is {DEFAULT_MAX_STEPS}.",
     )
     parser.add_argument(
+        "--max-duration",
+        type=float,
+        default=DEFAULT_MAX_DURATION,
+        help=f"The maximum duration of steps to run the simulation. Default is {DEFAULT_MAX_DURATION}.",
+    )
+    parser.add_argument(
         "--max-errors",
         type=int,
         default=DEFAULT_MAX_ERRORS,
@@ -174,6 +181,7 @@ def main():
                 num_trials=args.num_trials,
                 max_steps=args.max_steps,
                 max_errors=args.max_errors,
+                max_duration=args.max_duration,
                 save_to=args.save_to,
                 max_concurrency=args.max_concurrency,
                 seed=args.seed,

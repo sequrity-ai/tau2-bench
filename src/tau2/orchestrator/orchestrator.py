@@ -88,6 +88,7 @@ class Orchestrator:
         task: Task,
         max_steps: int = 100,
         max_errors: int = 10,
+        max_duration: Optional[float] = None,
         seed: Optional[int] = None,
         solo_mode: bool = False,
         validate_communication: bool = False,
@@ -124,6 +125,7 @@ class Orchestrator:
         self.trajectory: list[Message] = []
         self.max_steps = max_steps
         self.max_errors = max_errors
+        self.max_duration = max_duration
         self.step_count = 0
         self.done = False
         self.termination_reason: Optional[TerminationReason] = None
@@ -391,10 +393,20 @@ class Orchestrator:
             SimulationRun: The simulation run.
         """
         start_time = get_now()
+        start_time = time.perf_counter()  # High-resolution timer
         start = time.perf_counter()
         self.initialize()
+
         while not self.done:
             self.step()
+
+            if self.max_duration is not None:
+                        elapsed = time.perf_counter() - start_time
+                        if elapsed >= self.max_duration:
+                            self.done = True
+                            self.termination_reason = TerminationReason.MAX_DURATION
+                            break  # Optional: exit loop early
+
             # Checking for maximum steps and errors only if the last message is not to the environment
             if self.to_role == Role.ENV:
                 continue
@@ -434,7 +446,7 @@ class Orchestrator:
         simulation_run = SimulationRun(
             id=str(uuid.uuid4()),
             task_id=self.task.id,
-            start_time=start_time,
+            start_time=str(int(start_time)),
             end_time=get_now(),
             duration=duration,
             termination_reason=self.termination_reason.value,

@@ -15,6 +15,7 @@ from tau2.config import (
     DEFAULT_LOG_LEVEL,
     DEFAULT_MAX_CONCURRENCY,
     DEFAULT_MAX_ERRORS,
+    DEFAULT_MAX_DURATION,
     DEFAULT_MAX_STEPS,
     DEFAULT_NUM_TRIALS,
     DEFAULT_SAVE_TO,
@@ -130,6 +131,13 @@ class RunConfig(BaseModel):
         Field(
             description="The maximum number of tool errors allowed in a row in the simulation",
             default=DEFAULT_MAX_ERRORS,
+        ),
+    ]
+    max_duration: Annotated[
+        float,
+        Field(
+            description="The maximum duration of tool errors allowed in a row in the simulation",
+            default=DEFAULT_MAX_DURATION,
         ),
     ]
     save_to: Annotated[
@@ -318,6 +326,7 @@ class TerminationReason(str, Enum):
     USER_STOP = "user_stop"
     AGENT_STOP = "agent_stop"
     MAX_STEPS = "max_steps"
+    MAX_DURATION = "max_duration"
     TOO_MANY_ERRORS = "too_many_errors"
     AGENT_ERROR = "agent_error"
     USER_ERROR = "user_error"

@@ -283,6 +283,7 @@ def generate(
         ]),
 
         'X-Security-Config': json.dumps({
+          **{
           "min_num_tools_for_filtering": min_num_tools_for_filtering,
           "cache_tool_result": "none", #"all", # "none"
           "force_to_cache": [], # you can tell what tool calls can be cached
@@ -302,6 +303,9 @@ def generate(
             "strip_response_content": True,
             "include_program": False
           }
+          },
+          **({"pllm_custom_instructions": defence_params['pllm_custom_instructions']}
+             if defence_params.get('pllm_custom_instructions') is not None else {}),
         }),
 
         'X-Security-Policy': json.dumps({

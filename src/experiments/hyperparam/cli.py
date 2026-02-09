@@ -19,6 +19,8 @@ DEFAULT_NUM_TRIALS = 4
 DEFAULT_SEED = 300
 DEFAULT_MAX_STEPS = 200
 DEFAULT_MAX_ERRORS = 10
+DEFAULT_MAX_DURATION = 60*4
+
 DEFAULT_DOMAINS = ["retail", "airline", "telecom"]
 DEFAULT_MODES = [
     RunMode.DEFAULT.value,
@@ -91,6 +93,12 @@ def get_cli_parser() -> argparse.ArgumentParser:
         "--max-errors",
         type=int,
         default=DEFAULT_MAX_ERRORS,
+        help="Maximum number of errors allowed",
+    )
+    run_parser.add_argument(
+        "--max-duration",
+        type=float,
+        default=DEFAULT_MAX_DURATION,
         help="Maximum number of errors allowed",
     )
     run_parser.add_argument(

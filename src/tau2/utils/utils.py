@@ -36,6 +36,8 @@ defence_params = {
 
     "bot_direct_model": False,  # if for user the server should talk to the server directly
     "user_direct_model": True, # if for user the server should talk to the server directly
+
+    "pllm_custom_instructions": None,
 }
 
 res = load_dotenv()
