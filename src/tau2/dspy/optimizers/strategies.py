@@ -276,6 +276,7 @@ class GEPAStrategy(OptimizationStrategy):
             def _fallback_propose_new_texts(
                 adapter_self, candidate, reflective_dataset, components_to_update
             ):
+                exit()
                 """Fallback proposer when no reflection_lm is provided."""
                 adapter_self._mutation_step += 1
                 proposals = {}
@@ -296,6 +297,7 @@ class GEPAStrategy(OptimizationStrategy):
                     else:
                         proposals[component] = f"{current.rstrip()}\n\n{suffix}"
                 return proposals
+
 
         adapter = Tau2GEPAAdapter(
             evaluator,

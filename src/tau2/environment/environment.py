@@ -173,6 +173,8 @@ class Environment:
             tool_kit = self.tools
         else:
             raise ValueError(f"Invalid environment type: {env_type}")
+        if tool_kit is None:
+            raise ValueError(f"No {env_type} tools available in environment to call {func_name}")
         func = getattr(tool_kit, func_name)
         if func is None:
             raise ValueError(f"Function {func_name} not found in {env_type} tools")

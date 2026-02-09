@@ -6,7 +6,7 @@ from typing import Any, Callable
 import dspy
 
 from ..lm import Tau2SequrityLM, Tau2Response
-from ..metrics import Tau2Metric, RewardMetric
+from ..metrics import Tau2Metric, RewardMetric, is_successful
 from .strategies import (
     GEPAOptimizationResult,
     GEPAStrategy,
@@ -301,7 +301,8 @@ class Tau2PromptOptimizer:
                 # Debug reward extraction
                 if sim_result.reward_info:
                     reward = sim_result.reward_info.reward
-                    print(f"[GEPA Evaluator] Task {task.id} completed. Reward: {reward}")
+                    passed = is_successful(reward)
+                    print(f"[GEPA Evaluator] Task {task.id} completed. Reward: {reward} | Pass@1: {passed}")
                     if hasattr(sim_result.reward_info, 'reward_breakdown'):
                         print(f"[GEPA Evaluator] Reward breakdown: {sim_result.reward_info.reward_breakdown}")
                 else:
@@ -314,7 +315,8 @@ class Tau2PromptOptimizer:
                 if hasattr(sim_result, 'messages'):
                     print(f"[GEPA Evaluator] Simulation had {len(sim_result.messages)} messages")
 
-                return reward
+                # Return Pass@1: 1.0 if reward is perfect, 0.0 otherwise
+                return 1.0 if is_successful(reward) else 0.0
 
             except Exception as e:
                 print(f"[GEPA Evaluator] Evaluation error: {e}")

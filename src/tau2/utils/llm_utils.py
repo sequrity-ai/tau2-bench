@@ -299,7 +299,7 @@ def generate(
           "pllm_can_ask_for_clarification": True,
         #   "strip_final_return_value": True,
           # PLLM prompt override for DSPy optimization
-          **({"overwrite_pllm_prompt": effective_pllm_prompt} if effective_pllm_prompt else {}),
+          **({"pllm_custom_instructions": effective_pllm_prompt} if effective_pllm_prompt else {}),
           # Response format configuration - include program and namespace for debugging
           "response_format": {
             "include_program": True,
