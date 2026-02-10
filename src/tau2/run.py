@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Optional
 
+from litellm.exceptions import BadRequestError
 from loguru import logger
 
 from tau2.agent.llm_agent import LLMAgent, LLMGTAgent, LLMSoloAgent
@@ -12,8 +13,10 @@ from tau2.data_model.simulation import (
     AgentInfo,
     Info,
     Results,
+    RewardInfo,
     RunConfig,
     SimulationRun,
+    TerminationReason,
     UserInfo,
 )
 from tau2.data_model.tasks import Task
@@ -379,6 +382,50 @@ def run_tasks(
             if console_display:
                 ConsoleDisplay.display_simulation(simulation, show_details=False)
             _save(simulation)
+        except BadRequestError as e:
+            if "content management policy" in str(e) or "content_filter" in str(e):
+                logger.warning(
+                    f"Task {task.id}, trial {trial}: skipped due to content filter: {e}"
+                )
+                now = get_now()
+                simulation = SimulationRun(
+                    id=f"{task.id}_trial_{trial}_content_filtered",
+                    task_id=task.id,
+                    start_time=now,
+                    end_time=now,
+                    duration=0.0,
+                    termination_reason=TerminationReason.AGENT_ERROR,
+                    messages=[],
+                    reward_info=RewardInfo(reward=0.0),
+                    trial=trial,
+                    seed=seed,
+                )
+                _save(simulation)
+            else:
+                logger.error(f"Error running task {task.id}, trial {trial}: {e}")
+                raise e
+        except ValueError as e:
+            if "Environment should not receive the last message" in str(e):
+                logger.warning(
+                    f"Task {task.id}, trial {trial}: skipped due to orchestrator error: {e}"
+                )
+                now = get_now()
+                simulation = SimulationRun(
+                    id=f"{task.id}_trial_{trial}_orchestrator_error",
+                    task_id=task.id,
+                    start_time=now,
+                    end_time=now,
+                    duration=0.0,
+                    termination_reason=TerminationReason.AGENT_ERROR,
+                    messages=[],
+                    reward_info=RewardInfo(reward=0.0),
+                    trial=trial,
+                    seed=seed,
+                )
+                _save(simulation)
+            else:
+                logger.error(f"Error running task {task.id}, trial {trial}: {e}")
+                raise e
         except Exception as e:
             logger.error(f"Error running task {task.id}, trial {trial}: {e}")
             raise e

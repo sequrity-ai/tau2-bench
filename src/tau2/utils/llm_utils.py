@@ -75,7 +75,11 @@ ALLOW_SONNET_THINKING = False
 
 if not ALLOW_SONNET_THINKING:
     logger.warning("Sonnet thinking is disabled")
-
+perplexity_cfg = {
+    "compute_pllm_perplexity_ratio": True,
+    "pllm_perplexity_ratio_top_logprobs": 5,
+    "show_pllm_secure_var_values": "none",  # overrides your current "basic-notext"
+}
 
 def _parse_ft_model_name(model: str) -> str:
     """
@@ -301,7 +305,7 @@ def generate(
           "show_pllm_secure_var_values": "basic-notext",
           "response_format": {
             "strip_response_content": True,
-            "include_program": False
+            "include_program": True
           }
           },
           **({"pllm_custom_instructions": defence_params['pllm_custom_instructions']}
