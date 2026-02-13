@@ -13,6 +13,7 @@ data/exp/
 data/datasets/
 data/models/
 data/analyses/
+data/task_analysis/
 src/experiments/model_serving/vllm_serving/.*
 .ruff_cache
 
