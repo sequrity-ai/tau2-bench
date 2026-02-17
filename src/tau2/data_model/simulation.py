@@ -364,6 +364,9 @@ class SimulationRun(BaseModel):
     seed: Optional[int] = Field(
         description="Seed used for the simulation.", default=None
     )
+    session_id: Optional[str] = Field(
+        description="The session ID from the orchestrator endpoint.", default=None
+    )
 
 
 class Results(BaseModel):

@@ -443,6 +443,7 @@ class Orchestrator:
             agent_cost, user_cost = None, None
         else:
             agent_cost, user_cost = res
+        agent_session_id = getattr(self.agent, 'session_id', None)
         simulation_run = SimulationRun(
             id=str(uuid.uuid4()),
             task_id=self.task.id,
@@ -455,6 +456,7 @@ class Orchestrator:
             agent_cost=agent_cost,
             messages=messages,
             seed=self.seed,
+            session_id=agent_session_id,
         )
         return simulation_run
 
