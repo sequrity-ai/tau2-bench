@@ -3,6 +3,8 @@ import re
 from typing import Any, Optional
 import os
 
+from sequrity.control import FeaturesHeader, FineGrainedConfigHeader, SecurityPolicyHeader
+
 import litellm
 litellm.return_response_headers = True
 litellm.suppress_debug_info = True
@@ -272,61 +274,50 @@ def generate(
         dual_llm_mode = user_dual_llm_mode 
         reasoning_effort = reasoning_effort_user
 
-    headers={
+    if dual_llm_mode:
+        features = FeaturesHeader.dual_llm()
+        policy = SecurityPolicyHeader.dual_llm(
+            mode="strict" if strict_mode else "standard",
+            codes=tool_policies,
+            auto_gen=auto_gen_policies,
+            fail_fast=fail_fast,
+            default_allow=allow_undefined_tools,
+        )
+        config = FineGrainedConfigHeader.dual_llm(
+            min_num_tools_for_filtering=min_num_tools_for_filtering,
+            max_n_turns=max_n_turns,
+            max_pllm_steps=max_retry_attempts,
+            clear_history_every_n_attempts=clear_history_every_n_attempts,
+            retry_on_policy_violation=retry_on_policy_violation,
+            enable_multistep_planning=multistepmode,
+            pllm_debug_info_level=pllm_debug_info_level,
+            strip_response_content=True,
+            include_program=False,
+        )
+    else:
+        features = FeaturesHeader.single_llm()
+        policy = SecurityPolicyHeader.single_llm(
+            mode="strict" if strict_mode else "standard",
+            codes=tool_policies,
+            fail_fast=fail_fast,
+            default_allow=allow_undefined_tools,
+        )
+        config = FineGrainedConfigHeader.single_llm(
+            min_num_tools_for_filtering=min_num_tools_for_filtering,
+            max_n_turns=max_n_turns,
+        )
+
+    headers = {
         "Content-Type": "application/json",
-        "Authorization" : f"Bearer {os.environ['X_Sequrity_Api_Key']}",
-        "X-Api-Key": os.environ["X_Api_Key"], 
-
-        "X-Security-Features":  json.dumps([
-          {"feature_name": "Dual LLM" if dual_llm_mode else "Single LLM", 
-              "config_json": json.dumps(
-                  {"mode": "strict" if strict_mode else "standard"})}, # or strict
-          {"feature_name": "Long Program Support", 
-              "config_json": json.dumps(
-                  {"mode": "base"})},
-        ]),
-
-        'X-Security-Config': json.dumps({
-          **{
-          "min_num_tools_for_filtering": min_num_tools_for_filtering,
-          "cache_tool_result": "none", #"all", # "none"
-          "force_to_cache": [], # you can tell what tool calls can be cached
-          "max_pllm_attempts": max_retry_attempts,
-          "max_n_turns": max_n_turns,
-          "clear_history_every_n_attempts": clear_history_every_n_attempts,
-          "retry_on_policy_violation": retry_on_policy_violation,
-          "pllm_debug_info_level": pllm_debug_info_level,
-          "enable_multi_step_planning": multistepmode,
-
-          #"plan_reduction": op_type,
-          #"n_plans": num_plans,
-          "disable_rllm": True,
-          "pllm_can_ask_for_clarification": True,
-          "show_pllm_secure_var_values": "basic-notext",
-          "response_format": {
-            "strip_response_content": True,
-            "include_program": True
-          }
-          },
-          **({"pllm_custom_instructions": defence_params['pllm_custom_instructions']}
-             if defence_params.get('pllm_custom_instructions') is not None else {}),
-        }),
-
-        'X-Security-Policy': json.dumps({
-          "language": "sqrt",
-          "fail_fast": fail_fast,
-          "auto_gen":  auto_gen_policies,
-          "codes":     tool_policies,
-
-          "internal_policy_preset": {
-              "default_allow": allow_undefined_tools,
-              "enable_non_executable_memory": True,
-          }
-        }),
+        "Authorization": f"Bearer {os.environ['X_Sequrity_Api_Key']}",
+        "X-Api-Key": os.environ["X_Api_Key"],
+        "X-Features": features.dump_for_headers(),
+        "X-Policy": policy.dump_for_headers(),
+        "X-Config": config.dump_for_headers(),
     }
 
-    if (session_id is not None):
-        headers["x-session-id"] = session_id
+    if session_id is not None:
+        headers["X-Session-ID"] = session_id
 
     if (who_from in ["USER",]) and defence_params['user_direct_model']:
         headers = {}
