@@ -113,29 +113,40 @@ def make_run_name(config: RunConfig) -> str:
 
 
 def _make_annotation_callback(
-    source: str = "tau2-bench",
+    source: str = "tau2_bench",
 ) -> Optional[Callable[[SimulationRun, str], None]]:
     """Create a callback that annotates each completed simulation via the SDK.
 
     Returns ``None`` if the required environment variables
-    (``X_Sequrity_Api_Key``, ``ENDPOINT_ADDRESS``) are not set.
+    (``X_Sequrity_Api_Key``) and at least one of
+    ``ANNOTATION_ENDPOINT_ADDRESS`` / ``ENDPOINT_ADDRESS`` are not set.
+
+    The annotation server runs as a standalone tool (default port 8082),
+    so ``ANNOTATION_ENDPOINT_ADDRESS`` (e.g. ``http://localhost:8082``) is
+    checked first.  Falls back to deriving the base URL from
+    ``ENDPOINT_ADDRESS`` for backwards compatibility.
     """
     api_key = os.environ.get("X_Sequrity_Api_Key")
+    annotation_endpoint = os.environ.get("ANNOTATION_ENDPOINT_ADDRESS")
     endpoint = os.environ.get("ENDPOINT_ADDRESS")
-    if not api_key or not endpoint:
-        return None
 
-    # ENDPOINT_ADDRESS is e.g. "http://localhost:8000/control/chat/v1" —
-    # strip back to the base URL (scheme + host + port).
     from urllib.parse import urlparse
 
-    parsed = urlparse(endpoint)
-    base_url = f"{parsed.scheme}://{parsed.netloc}"
+    if annotation_endpoint:
+        # Standalone annotation server — API key is optional (server may
+        # run without --api-key for local dev).
+        base_url = annotation_endpoint.rstrip("/")
+    elif api_key and endpoint:
+        # Legacy path: derive base URL from ENDPOINT_ADDRESS.
+        parsed = urlparse(endpoint)
+        base_url = f"{parsed.scheme}://{parsed.netloc}"
+    else:
+        return None
 
     from sequrity import SequrityClient
     from sequrity._exceptions import SequrityAPIError
 
-    client = SequrityClient(api_key=api_key, base_url=base_url, timeout=30)
+    client = SequrityClient(api_key=api_key or "", base_url=base_url, timeout=30)
 
     def _annotate(simulation: SimulationRun, domain: str) -> None:
         if not simulation.session_id:
@@ -255,7 +266,7 @@ def run_domain(config: RunConfig) -> Results:
     if save_to is None:
         save_to = make_run_name(config)
     save_to = DATA_DIR / "simulations" / f"{save_to}.json"
-    annotation_callback = _make_annotation_callback(source="tau2-bench")
+    annotation_callback = _make_annotation_callback(source="tau2_bench")
     if annotation_callback:
         logger.info("Inline annotation enabled — sessions will be annotated on completion")
 
