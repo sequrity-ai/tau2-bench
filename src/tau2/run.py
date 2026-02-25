@@ -1,9 +1,10 @@
 import json
 import multiprocessing
+import os
 import random
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 from litellm.exceptions import BadRequestError
 from loguru import logger
@@ -111,6 +112,106 @@ def make_run_name(config: RunConfig) -> str:
     return f"{get_now()}_{config.domain}_{agent_name}_{user_name}"
 
 
+def _make_annotation_callback(
+    source: str = "tau2-bench",
+) -> Optional[Callable[[SimulationRun, str], None]]:
+    """Create a callback that annotates each completed simulation via the SDK.
+
+    Returns ``None`` if the required environment variables
+    (``X_Sequrity_Api_Key``, ``ENDPOINT_ADDRESS``) are not set.
+    """
+    api_key = os.environ.get("X_Sequrity_Api_Key")
+    endpoint = os.environ.get("ENDPOINT_ADDRESS")
+    if not api_key or not endpoint:
+        return None
+
+    # ENDPOINT_ADDRESS is e.g. "http://localhost:8000/control/chat/v1" —
+    # strip back to the base URL (scheme + host + port).
+    from urllib.parse import urlparse
+
+    parsed = urlparse(endpoint)
+    base_url = f"{parsed.scheme}://{parsed.netloc}"
+
+    from sequrity import SequrityClient
+    from sequrity._exceptions import SequrityAPIError
+
+    client = SequrityClient(api_key=api_key, base_url=base_url, timeout=30)
+
+    def _annotate(simulation: SimulationRun, domain: str) -> None:
+        if not simulation.session_id:
+            return
+
+        reward_info = simulation.reward_info
+        reward = float(reward_info.reward) if reward_info else None
+        task_success = reward == 1.0 if reward is not None else None
+
+        labels: dict = {}
+        if task_success is not None:
+            labels["task_success"] = task_success
+        labels["task_id"] = simulation.task_id
+        labels["domain"] = domain
+        if reward is not None:
+            labels["reward"] = reward
+
+        # Derive error category from reward breakdown.
+        error_category = None
+        if reward_info and not task_success:
+            breakdown = (
+                reward_info.reward_breakdown
+                if hasattr(reward_info, "reward_breakdown")
+                else None
+            )
+            if breakdown:
+                failed = [k for k, v in breakdown.items() if v == 0 or v is False]
+                if failed:
+                    error_category = ",".join(sorted(str(f) for f in failed))
+        if error_category:
+            labels["error_category"] = error_category
+
+        # Build rich metadata.
+        metadata: dict = {
+            "termination_reason": simulation.termination_reason
+            if isinstance(simulation.termination_reason, str)
+            else simulation.termination_reason.value
+            if hasattr(simulation.termination_reason, "value")
+            else str(simulation.termination_reason),
+            "duration": simulation.duration,
+            "num_messages": len(simulation.messages),
+        }
+        if simulation.trial is not None:
+            metadata["trial"] = simulation.trial
+        if simulation.seed is not None:
+            metadata["seed"] = simulation.seed
+        if simulation.agent_cost is not None:
+            metadata["agent_cost"] = simulation.agent_cost
+        if simulation.user_cost is not None:
+            metadata["user_cost"] = simulation.user_cost
+        if reward_info:
+            if hasattr(reward_info, "reward_breakdown") and reward_info.reward_breakdown:
+                metadata["reward_breakdown"] = {
+                    str(k): v for k, v in reward_info.reward_breakdown.items()
+                }
+            if hasattr(reward_info, "reward_basis") and reward_info.reward_basis:
+                metadata["reward_basis"] = [
+                    str(r) if not isinstance(r, str) else r
+                    for r in reward_info.reward_basis
+                ]
+
+        try:
+            client.control.annotations.create(
+                session_id=simulation.session_id,
+                source=source,
+                labels=labels,
+                metadata=metadata,
+            )
+        except SequrityAPIError as exc:
+            logger.warning(
+                f"Annotation failed for session {simulation.session_id}: {exc}"
+            )
+
+    return _annotate
+
+
 def run_domain(config: RunConfig) -> Results:
     """
     Run simulations for a domain
@@ -154,6 +255,10 @@ def run_domain(config: RunConfig) -> Results:
     if save_to is None:
         save_to = make_run_name(config)
     save_to = DATA_DIR / "simulations" / f"{save_to}.json"
+    annotation_callback = _make_annotation_callback(source="tau2-bench")
+    if annotation_callback:
+        logger.info("Inline annotation enabled — sessions will be annotated on completion")
+
     simulation_results = run_tasks(
         domain=config.domain,
         tasks=tasks,
@@ -174,6 +279,7 @@ def run_domain(config: RunConfig) -> Results:
         seed=config.seed,
         log_level=config.log_level,
         enforce_communication_protocol=config.enforce_communication_protocol,
+        on_simulation_complete=annotation_callback,
     )
     metrics = compute_metrics(simulation_results)
     ConsoleDisplay.display_agent_metrics(metrics)
@@ -201,6 +307,7 @@ def run_tasks(
     seed: Optional[int] = 300,
     log_level: Optional[str] = "INFO",
     enforce_communication_protocol: bool = False,
+    on_simulation_complete: Optional[Callable[[SimulationRun, str], None]] = None,
 ) -> Results:
     """
     Runs tasks for a given domain.
@@ -382,6 +489,11 @@ def run_tasks(
             if console_display:
                 ConsoleDisplay.display_simulation(simulation, show_details=False)
             _save(simulation)
+            if on_simulation_complete is not None:
+                try:
+                    on_simulation_complete(simulation, domain)
+                except Exception as cb_err:
+                    logger.warning(f"on_simulation_complete callback failed for task {task.id}: {cb_err}")
         except BadRequestError as e:
             if "content management policy" in str(e) or "content_filter" in str(e):
                 logger.warning(
@@ -401,11 +513,18 @@ def run_tasks(
                     seed=seed,
                 )
                 _save(simulation)
+                if on_simulation_complete is not None:
+                    try:
+                        on_simulation_complete(simulation, domain)
+                    except Exception as cb_err:
+                        logger.warning(f"on_simulation_complete callback failed for task {task.id}: {cb_err}")
             else:
                 logger.error(f"Error running task {task.id}, trial {trial}: {e}")
                 raise e
         except ValueError as e:
-            if "Environment should not receive the last message" in str(e):
+            err_msg = str(e)
+            if ("Environment should not receive the last message" in err_msg
+                    or "must have either content or tool calls" in err_msg):
                 logger.warning(
                     f"Task {task.id}, trial {trial}: skipped due to orchestrator error: {e}"
                 )
@@ -423,6 +542,11 @@ def run_tasks(
                     seed=seed,
                 )
                 _save(simulation)
+                if on_simulation_complete is not None:
+                    try:
+                        on_simulation_complete(simulation, domain)
+                    except Exception as cb_err:
+                        logger.warning(f"on_simulation_complete callback failed for task {task.id}: {cb_err}")
             else:
                 logger.error(f"Error running task {task.id}, trial {trial}: {e}")
                 raise e

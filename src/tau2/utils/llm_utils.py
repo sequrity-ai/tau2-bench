@@ -245,7 +245,7 @@ def generate(
     user_dual_llm_mode          = defence_params['user_dual_llm_mode']
 
     strict_mode                 = defence_params['strict_mode']
-    multistepmode               = defence_params['multistepmode']
+    multistepmode               = defence_params.get('enable_multistep_planning', False) or defence_params.get('multistepmode', False)
 
     op_type                     = defence_params['plan_reduction']
     num_plans                   = defence_params['n_plans']
@@ -259,19 +259,20 @@ def generate(
 
     pllm_debug_info_level       = defence_params['pllm_debug_info_level']
     min_num_tools_for_filtering = defence_params['min_num_tools_for_filtering']
+    pllm_custom_instructions    = defence_params.get('pllm_custom_instructions')
 
-    # USER if its a message from user, 
-    # BOT if the agent, 
-    # GTBOT if ground truth bot, 
-    # SOLOBOT if solobot, 
-    # INTERFACEBOT for interface bot, 
+    # USER if its a message from user,
+    # BOT if the agent,
+    # GTBOT if ground truth bot,
+    # SOLOBOT if solobot,
+    # INTERFACEBOT for interface bot,
     # ASSERTIONBOT for assertion evaluation
     if who_from in ["BOT", "SOLOBOT"]:
         dual_llm_mode = bot_dual_llm_mode
         reasoning_effort = reasoning_effort_bot
 
     if who_from in ['USER']:
-        dual_llm_mode = user_dual_llm_mode 
+        dual_llm_mode = user_dual_llm_mode
         reasoning_effort = reasoning_effort_user
 
     if dual_llm_mode:
@@ -291,6 +292,7 @@ def generate(
             retry_on_policy_violation=retry_on_policy_violation,
             enable_multistep_planning=multistepmode,
             pllm_debug_info_level=pllm_debug_info_level,
+            pllm_custom_instructions=pllm_custom_instructions,
             strip_response_content=True,
             include_program=False,
         )
